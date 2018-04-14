@@ -33,6 +33,18 @@ class ZgitIgnoreTest(unittest.TestCase):
     self.assertEqual('\\ \\ \\ \\ \\ \\ ' in pat, False)
     self.assertEqual('\\ \\ \\ \\ \\ ' in pat, True)
 
+  def test_convert_escapes(self):
+    pat, dir, negate = zgitignore.convert_pattern('\\!important')
+    self.assertEqual(pat, '^(?:.+/)?\\!important$')
+
+    pat, dir, negate = zgitignore.convert_pattern('\\#test#')
+    self.assertEqual(pat, '^(?:.+/)?\\#test\\#$')
+
+    pat, dir, negate = zgitignore.convert_pattern('g\\zzzzz\\gzzzzz')
+    self.assertEqual(pat, '^(?:.+/)?gzzzzzgzzzzz$')
+
+    pat, dir, negate = zgitignore.convert_pattern('a\\{[0-9]{3,6\\}}|')
+    self.assertEqual(pat, '^(?:.+/)?a\\{[0-9]3,6}\\|$')
 
   def test_convert_slash(self):
     pat, dir, negate = zgitignore.convert_pattern('lolo/rosso')
@@ -186,6 +198,11 @@ class ZgitIgnoreTest(unittest.TestCase):
     test3 = zgitignore.ZgitIgnore(['exclude', '!exclude', 'exclude'])
     self.assertEqual(test3.is_ignored('exclude'), True)
 
+    test4 = zgitignore.ZgitIgnore(['\\#test#', '\\!important'])
+    self.assertEqual(test4.is_ignored('#test#'), True)
+    self.assertEqual(test4.is_ignored('!important'), True)
+
+
   def test_class_case(self):
     test1 = zgitignore.ZgitIgnore(['*readme*'])
     self.assertEqual(test1.is_ignored('readme.txt'), True)
@@ -202,7 +219,17 @@ class ZgitIgnoreTest(unittest.TestCase):
     self.assertEqual(test1.is_ignored('testcolor#4.test'), False)
     self.assertEqual(test1.is_ignored('testcolor#04zzzz.test'), False)
 
+  def test_docker(self):
+    pat, dir, negate = zgitignore.convert_pattern('test', docker=True)
+    self.assertEqual(pat, '^test$')
 
+    pat, dir, negate = zgitignore.convert_pattern('!test', docker=True)
+    self.assertEqual(pat, '^test$')
+
+  def test_check_parents(self):
+    test1 = zgitignore.ZgitIgnore(['build/'])
+    self.assertEqual(test1.is_ignored('build/test', is_directory=False, check_parents=True), True)
+    self.assertEqual(test1.is_ignored('build/test', is_directory=True, check_parents=True), True)
 
 
 if __name__ == '__main__':

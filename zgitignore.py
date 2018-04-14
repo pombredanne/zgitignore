@@ -28,7 +28,7 @@ def normalize_path(path, sep=os.path.sep):
     return path
 
 
-def convert_pattern(pat):
+def convert_pattern(pat, docker=False):
     if not pat or pat[0] == '#' or pat == '/':
         return None
 
@@ -66,7 +66,7 @@ def convert_pattern(pat):
 
     # because if it ends with a slash and doesn't contain any other ones, it's
     # still for any directory
-    if not '/' in pat[:-1]:
+    if '/' not in pat[:-1] and not docker:
         regex += '(?:.+/)?'
 
     # cut the **/
@@ -78,6 +78,7 @@ def convert_pattern(pat):
         if void:
             regex += re.escape(pat[ptr])
             void = False
+            ptr += 1
 
         elif pat[ptr] == '\\':
             ptr += 1
@@ -166,22 +167,29 @@ def convert_pattern(pat):
 
 class ZgitIgnore():
 
-    def __init__(self, lines=None, ignore_case=False):
+    def __init__(self, lines=None, ignore_case=False, docker=False):
         self.lines = lines
         self.ignore_case = ignore_case
         self.patterns = []  # order is important
+        self.docker = docker
 
         if lines:
             self.add_patterns(lines)
 
     def add_patterns(self, lines):
         for line in lines:
-            pattern = convert_pattern(line)
+            pattern = convert_pattern(line, self.docker)
             if pattern:
                 self.patterns.append(pattern)
 
-    def is_ignored(self, what, is_directory=False):
+    def is_ignored(self, what, is_directory=False, check_parents=False):
         what = normalize_path(what)
+
+        parent = os.path.dirname(what)
+        if check_parents and parent != '':
+            result = self.is_ignored(parent, is_directory=True, check_parents=True)
+            if result:
+                return True
 
         ignored = False
 
